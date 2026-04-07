@@ -1,0 +1,32 @@
+name: Eurostar Snap Checker
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright psycopg2-binary
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run checker
+        env:
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+        run: python checker.py
