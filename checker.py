@@ -329,7 +329,7 @@ def send_email_brevo(available_entries):
     for route in CHECK_ROUTES:
         route_entries = [e for e in available_entries if e["route"] == route]
         if not route_entries:
-            continue
+            route_entries = [{"route": route, "date": d, "morning": None, "afternoon": None} for d in CHECK_DATES]
         route_entries_sorted = sorted(route_entries, key=lambda e: e["date"])
         sections.append(f"<h3 style=\"font-family:Arial,Helvetica,sans-serif\">{route}</h3>" + build_table(route_entries_sorted))
 
