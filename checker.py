@@ -352,9 +352,13 @@ def send_email_brevo(available_entries):
             },
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            if resp.status not in (200, 201, 202):
-                raise RuntimeError(f"Brevo error: {resp.status}")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                print(f"[Email] Sent to {recipient}, status: {resp.status}")
+                if resp.status not in (200, 201, 202):
+                    raise RuntimeError(f"Brevo error: {resp.status}")
+        except Exception as e:
+            print(f"[Email ERROR] Failed to send to {recipient}: {e}")
 
 def main():
     if DATABASE_URL:
