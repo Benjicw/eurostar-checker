@@ -4,6 +4,24 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+    inputs:
+      dates:
+        description: 'Dates to check (comma separated, YYYY-MM-DD)'
+        required: true
+        default: '2026-04-20,2026-04-21,2026-04-22'
+      routes:
+        description: 'Routes to check (comma separated)'
+        required: true
+        default: 'Paris → London,Lille → London'
+        type: choice
+        options:
+          - 'Paris → London'
+          - 'Lille → London'
+          - 'London → Paris'
+          - 'London → Lille'
+          - 'Paris → London,Lille → London'
+          - 'London → Paris,London → Lille'
+          - 'Paris → London,Lille → London,London → Paris,London → Lille'
 
 jobs:
   check:
@@ -11,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -29,4 +47,6 @@ jobs:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          CHECK_DATES: ${{ github.event.inputs.dates || '2026-04-20,2026-04-21,2026-04-22' }}
+          CHECK_ROUTES: ${{ github.event.inputs.routes || 'Paris → London,Lille → London' }}
         run: python checker.py
