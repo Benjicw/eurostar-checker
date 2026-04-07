@@ -13,15 +13,14 @@ from psycopg2.extras import execute_values
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
-MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN", "my-pau.com")
-MAILGUN_SENDER_EMAIL = os.getenv("MAILGUN_SENDER_EMAIL", f"eurostar@{MAILGUN_DOMAIN}")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT")
 
 if not EMAIL_RECIPIENT:
-    raise RuntimeError("Missing env var: set EMAIL_RECIPIENT")
-if not MAILGUN_API_KEY:
-    raise RuntimeError("Missing env var MAILGUN_API_KEY")
+    raise RuntimeError("Missing env var: EMAIL_RECIPIENT")
+if not BREVO_API_KEY:
+    raise RuntimeError("Missing env var: BREVO_API_KEY")
 
 def get_db_conn():
     if not DATABASE_URL:
@@ -303,7 +302,7 @@ async def check_snap(playwright, route_name, base_url):
     await browser.close()
     return results
 
-def send_email_mailgun(available_entries):
+def send_email_brevo(available_entries):
     def build_table(rows):
         parts = []
         th_style = 'style="border:1px solid #ddd;padding:8px;text-align:left;background:#f7f7f7"'
@@ -312,50 +311,51 @@ def send_email_mailgun(available_entries):
         parts.append(f"<tr><th {th_style}>Date</th><th {th_style}>Morning</th><th {th_style}>Afternoon</th></tr>")
         for r in rows:
             def cell(slot):
-                if not slot: return "—<br/><small>no availability for now</small>"
+                if not slot: return "—<br/><small>no availability</small>"
                 price_html = f'<a href="{slot["url"]}">{slot["price_text"]}</a>'
                 if slot.get("time_range"):
-                    start,end = slot["time_range"]; return f"{price_html}<br/><small>between {start} and {end}</small>"
-                return f"{price_html}<br/><small>no availability for now</small>"
+                    start, end = slot["time_range"]
+                    return f"{price_html}<br/><small>between {start} and {end}</small>"
+                return f"{price_html}<br/><small>no time info</small>"
             parts.append(f"<tr><td {td_style}>{_format_date_for_display(r['date'])}</td><td {td_style}>{cell(r.get('morning'))}</td><td {td_style}>{cell(r.get('afternoon'))}</td></tr>")
-        parts.append("</table>")
+        parts.append("<​/table>")
         return ''.join(parts)
 
-    header = "<div style=\"font-family:Arial,Helvetica,sans-serif\"><h2>Eurostar Snap availability</h2></div>"
+    header = "<div style=\"font-family:Arial,Helvetica,sans-serif\"><h2>🚄 Eurostar Snap availability</h2></div>"
     sections = []
-    for route in ["Paris → Amsterdam","Amsterdam → Paris"]:
+    for route in ["Paris → Amsterdam", "Amsterdam → Paris"]:
         route_entries = [e for e in available_entries if e["route"] == route]
         if not route_entries:
             continue
         route_entries_sorted = sorted(route_entries, key=lambda e: e["date"])
-        table_html = build_table(route_entries_sorted)
-        sections.append(f"<h3 style=\"font-family:Arial,Helvetica,sans-serif\">{route}</h3>" + table_html)
-    html = header + "".join(sections) if sections else header + "<p>No availability for selected dates.</p>"
+        sections.append(f"<h3 style=\"font-family:Arial,Helvetica,sans-serif\">{route}</h3>" + build_table(route_entries_sorted))
 
-    recipients = [email.strip() for email in EMAIL_RECIPIENT.split(",") if email.strip()]
-    subject = "Eurostar Snap — disponibilité détectée" if any(e.get("morning") or e.get("afternoon") for e in available_entries) else "Eurostar Snap — rapport (aucune dispo)"
+    html = header + "".join(sections) if sections else header + "<p>No availability found.</p>"
+    has_availability = any(e.get("morning") or e.get("afternoon") for e in available_entries)
+    subject = "🚄 Eurostar Snap — tickets available!" if has_availability else "Eurostar Snap — no availability yet"
 
-    auth = base64.b64encode(f"api:{MAILGUN_API_KEY}".encode()).decode()
-
+    recipients = [e.strip() for e in EMAIL_RECIPIENT.split(",") if e.strip()]
     for recipient in recipients:
-        data = urllib.parse.urlencode({
-            "from": f"Eurostar Snap <{MAILGUN_SENDER_EMAIL}>",
-            "to": recipient,
+        payload = json.dumps({
+            "sender": {"name": "Eurostar Checker", "email": EMAIL_SENDER},
+            "to": [{"email": recipient}],
             "subject": subject,
-            "html": html,
+            "htmlContent": html
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            f"https://api.eu.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
-            data=data,
+            "https://api.brevo.com/v3/smtp/email",
+            data=payload,
             headers={
-                "Authorization": f"Basic {auth}",
+                "api-key": BREVO_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             },
-            method="POST",
+            method="POST"
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
-            if resp.status not in (200, 201):
-                raise RuntimeError(f"Mailgun HTTP error: {resp.status}")
+            if resp.status not in (200, 201, 202):
+                raise RuntimeError(f"Brevo error: {resp.status}")
 
 def main():
     if DATABASE_URL:
@@ -371,7 +371,7 @@ def main():
             if DATABASE_URL:
                 save_run_to_db(all_available)
 
-            send_email_mailgun(all_available)
+            send_email_brevo(all_available)
 
     asyncio.run(run())
 
