@@ -105,7 +105,7 @@ def save_run_to_db(all_results, error_message=None):
     return run_id
 
 SNAP_PARIS_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727100&destination=7015400&outbound={date}"
-SNAP_LILLE_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727113&destination=7015400&outbound={date}"
+SNAP_LILLE_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8722326&destination=7015400&outbound={date}"
 
 def _normalize_time_component(value: int) -> str:
     return f"{value:02d}"
