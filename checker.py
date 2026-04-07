@@ -104,8 +104,8 @@ def save_run_to_db(all_results, error_message=None):
     print(f"[DB] Run #{run_id} enregistré ({len(rows)} résultats).")
     return run_id
 
-SNAP_PARIS_TO_AMS = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727100&destination=8400058&outbound={date}"
-SNAP_AMS_TO_PARIS = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8400058&destination=8727100&outbound={date}"
+SNAP_PARIS_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727100&destination=7015400&outbound={date}"
+SNAP_LILLE_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727113&destination=7015400&outbound={date}"
 
 def _normalize_time_component(value: int) -> str:
     return f"{value:02d}"
@@ -202,8 +202,7 @@ async def check_snap(playwright, route_name, base_url):
     page = await browser.new_page()
     results = []
 
-    for i in range(1, 9):
-        date = (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")
+    for date in ["2026-04-20", "2026-04-21", "2026-04-22"]:
         url = base_url.format(date=date)
         print(f"[Snap] Checking {route_name}: {url}")
         try:
@@ -323,7 +322,7 @@ def send_email_brevo(available_entries):
 
     header = "<div style=\"font-family:Arial,Helvetica,sans-serif\"><h2>🚄 Eurostar Snap availability</h2></div>"
     sections = []
-    for route in ["Paris → Amsterdam", "Amsterdam → Paris"]:
+    for route in ["Paris → London", "Lille → London"]:
         route_entries = [e for e in available_entries if e["route"] == route]
         if not route_entries:
             continue
@@ -363,8 +362,8 @@ def main():
 
     async def run():
         async with async_playwright() as playwright:
-            snap_1 = await check_snap(playwright, "Paris → Amsterdam", SNAP_PARIS_TO_AMS)
-            snap_2 = await check_snap(playwright, "Amsterdam → Paris", SNAP_AMS_TO_PARIS)
+            snap_1 = await check_snap(playwright, "Paris → London", SNAP_PARIS_TO_LONDON)
+            snap_2 = await check_snap(playwright, "Lille → London", SNAP_LILLE_TO_LONDON)
             all_available = snap_1 + snap_2
             print(f"ALL_AVAILABLE: {all_available}")
 
