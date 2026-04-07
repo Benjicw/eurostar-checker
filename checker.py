@@ -16,6 +16,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT")
+CHECK_DATES = [d.strip() for d in os.getenv("CHECK_DATES", "2026-04-20,2026-04-21,2026-04-22").split(",")]
+CHECK_ROUTES = [r.strip() for r in os.getenv("CHECK_ROUTES", "Paris → London,Lille → London").split(",")]
 
 if not EMAIL_RECIPIENT:
     raise RuntimeError("Missing env var: EMAIL_RECIPIENT")
@@ -106,6 +108,8 @@ def save_run_to_db(all_results, error_message=None):
 
 SNAP_PARIS_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8727100&destination=7015400&outbound={date}"
 SNAP_LILLE_TO_LONDON = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=8722326&destination=7015400&outbound={date}"
+SNAP_LONDON_TO_PARIS = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=7015400&destination=8727100&outbound={date}"
+SNAP_LONDON_TO_LILLE = "https://snap.eurostar.com/fr-fr/search?adult=1&origin=7015400&destination=8722326&outbound={date}"
 
 def _normalize_time_component(value: int) -> str:
     return f"{value:02d}"
@@ -202,7 +206,7 @@ async def check_snap(playwright, route_name, base_url):
     page = await browser.new_page()
     results = []
 
-    for date in ["2026-04-20", "2026-04-21", "2026-04-22"]:
+    for date in CHECK_DATES:
         url = base_url.format(date=date)
         print(f"[Snap] Checking {route_name}: {url}")
         try:
@@ -322,7 +326,7 @@ def send_email_brevo(available_entries):
 
     header = "<div style=\"font-family:Arial,Helvetica,sans-serif\"><h2>🚄 Eurostar Snap availability</h2></div>"
     sections = []
-    for route in ["Paris → London", "Lille → London"]:
+    for route in CHECK_ROUTES:
         route_entries = [e for e in available_entries if e["route"] == route]
         if not route_entries:
             continue
@@ -366,9 +370,16 @@ def main():
 
     async def run():
         async with async_playwright() as playwright:
-            snap_1 = await check_snap(playwright, "Paris → London", SNAP_PARIS_TO_LONDON)
-            snap_2 = await check_snap(playwright, "Lille → London", SNAP_LILLE_TO_LONDON)
-            all_available = snap_1 + snap_2
+            ROUTE_MAP = {
+                "Paris → London": SNAP_PARIS_TO_LONDON,
+                "Lille → London": SNAP_LILLE_TO_LONDON,
+                "London → Paris": SNAP_LONDON_TO_PARIS,
+                "London → Lille": SNAP_LONDON_TO_LILLE,
+            }
+            all_available = []
+            for route_name in CHECK_ROUTES:
+                if route_name in ROUTE_MAP:
+                    all_available += await check_snap(playwright, route_name, ROUTE_MAP[route_name])
             print(f"ALL_AVAILABLE: {all_available}")
 
             if DATABASE_URL:
