@@ -211,7 +211,7 @@ async def check_snap(playwright, route_name, base_url):
         print(f"[Snap] Checking {route_name}: {url}")
         try:
             await page.goto(url, timeout=60000)
-            await page.wait_for_timeout(5000)
+            await page.wait_for_timeout(15000)
 
             price_blocks = await page.query_selector_all("div[data-testid$='-price'], [data-testid*='price'], .price, [class*='price']")
             print(f"[DEBUG] Found {len(price_blocks)} price blocks for {date}")
@@ -329,9 +329,16 @@ def send_email_brevo(available_entries):
     for route in CHECK_ROUTES:
         route_entries = [e for e in available_entries if e["route"] == route]
         if not route_entries:
-            route_entries = [{"route": route, "date": d, "morning": None, "afternoon": None} for d in CHECK_DATES]
-        route_entries_sorted = sorted(route_entries, key=lambda e: e["date"])
-        sections.append(f"<h3 style=\"font-family:Arial,Helvetica,sans-serif\">{route}</h3>" + build_table(route_entries_sorted))
+            # Show empty table with all dates
+            route_entries = [{"route": route, "date": d, "url": "", "morning": None, "afternoon": None} for d in CHECK_DATES]
+        else:
+            # Fill in missing dates so all dates always appear
+            existing_dates = {e["date"] for e in route_entries}
+            for d in CHECK_DATES:
+                if d not in existing_dates:
+                    route_entries.append({"route": route, "date": d, "url": "", "morning": None, "afternoon": None})
+            route_entries = sorted(route_entries, key=lambda e: e["date"])
+        sections.append(f"<h3 style=\"font-family:Arial,Helvetica,sans-serif\">{route}</h3>" + build_table(route_entries))
 
     html = header + "".join(sections) if sections else header + "<p>No availability found.</p>"
     has_availability = any(e.get("morning") or e.get("afternoon") for e in available_entries)
