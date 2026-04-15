@@ -47,6 +47,6 @@ jobs:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          CHECK_DATES: ${{ github.event.inputs.dates || '2026-04-20,2026-04-21,2026-04-22' }}
+          CHECK_DATES: ${{ github.event.inputs.dates || '2026-04-20,2026-04-21,2026-04-22,2026-04-23' }}
           CHECK_ROUTES: ${{ github.event.inputs.routes || 'Paris → London' }}
         run: python checker.py
